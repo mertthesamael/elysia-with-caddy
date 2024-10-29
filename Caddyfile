@@ -1,0 +1,68 @@
+{
+    # Global options for on-demand TLS
+    on_demand_tls {
+        interval 2m
+        burst 5
+        ask http://localhost:3000/verify-domain # verify-domain enpoint for preventing unwanted domains to target your app
+    }
+}
+
+# Your existing domain
+caddyelysia.merto.dev {
+    reverse_proxy localhost:3000
+    encode gzip
+    
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        Permissions-Policy "interest-cohort=()"
+        X-XSS-Protection "1; mode=block"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+    }
+    
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+}
+
+# Handle dynamic customer domains
+:443 {
+    tls {
+        on_demand
+    }
+
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+
+    @customer_domains {
+        not host caddyelysia.merto.dev
+        host *.merto.dev # Change this
+        host *.your-second-domain.com # Also change this and add more if needed
+    }
+
+    handle @customer_domains {
+        reverse_proxy localhost:3000
+        encode gzip
+        
+        header {
+            Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+            Permissions-Policy "interest-cohort=()"
+            X-XSS-Protection "1; mode=block"
+            X-Frame-Options "DENY"
+            X-Content-Type-Options "nosniff"
+        }
+    }
+}
+
+# Redirect HTTP to HTTPS
+:80 {
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+    
+    redir https://{host}{uri} permanent
+}
